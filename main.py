@@ -1,10 +1,14 @@
+import csv
 import json
 import re
 from time import sleep
-import csv
+
+import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
+
+# pip install openpyxl
 
 def get_html(web_url):
     """Fetch the HTML content of a given URL."""
@@ -67,8 +71,6 @@ def extract_salary_info(job_title: str, job_city: str) -> tuple | None:
 
         return job_title, location, description, ntile_10, ntile_25, ntile_50, ntile_75, ntile_90
 
-    except AttributeError:
-        pass
     except requests.RequestException as e:
         print(f"HTTP request failed: {e}")
     except json.JSONDecodeError:
@@ -79,6 +81,30 @@ def extract_salary_info(job_title: str, job_city: str) -> tuple | None:
         print(f"An unexpected error occurred: {e}")
 
     return None
+
+
+def save_to_excel(file_path, data, headers):
+    """
+    Save data to an Excel file.
+
+    Args:
+        file_path (str): Path to the output Excel file.
+        data (list): A list of rows (tuples or lists) to save.
+        headers (list): A list of column headers for the Excel file.
+
+    Returns:
+        bool: True if the file was saved successfully, False otherwise.
+    """
+    if not file_path.endswith(".xlsx"):
+        file_path += ".xlsx"
+    try:
+        df = pd.DataFrame(data, columns=headers)
+        df.to_excel(file_path, index=False, engine='openpyxl')
+        print(f"Results saved to '{file_path}'.")
+        return True
+    except Exception as e:
+        print(f"Error writing to file '{file_path}': {e}")
+        return False
 
 
 def save_to_csv(file_path, data, headers):
@@ -93,11 +119,40 @@ def save_to_csv(file_path, data, headers):
     Returns:
         bool: True if the file was saved successfully, False otherwise.
     """
+    if not file_path.endswith(".csv"):
+        file_path += ".csv"
     try:
         with open(file_path, 'w', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
             writer.writerow(headers)
             writer.writerows(data)
+        print(f"Results saved to '{file_path}'.")
+        return True
+    except Exception as e:
+        print(f"Error writing to file '{file_path}': {e}")
+        return False
+
+
+def save_to_json(file_path, data, headers):
+    """
+    Save data to a JSON file.
+
+    Args:
+        file_path (str): Path to the output JSON file.
+        data (list): A list of rows (tuples or lists) to save.
+        headers (list): A list of column headers for the JSON file.
+
+    Returns:
+        bool: True if the file was saved successfully, False otherwise.
+    """
+    if not file_path.endswith(".json"):
+        file_path += ".json"
+    try:
+        # Convert data to a list of dictionaries
+        json_data = [dict(zip(headers, row)) for row in data]
+        # Save the data to a JSON file
+        with open(file_path, 'w', encoding='utf-8') as file:
+            json.dump(json_data, file, indent=4, ensure_ascii=False)
         print(f"Results saved to '{file_path}'.")
         return True
     except Exception as e:
@@ -117,6 +172,8 @@ def main(job_title, input_file='largest_cities.csv', output_file='salary_results
        Returns:
            list: A list of salary data tuples.
        """
+    if "." in output_file:
+        output_file = output_file.split(".")[0]
     try:
         with open(input_file, newline='', encoding="utf-8") as file:
             reader = csv.reader(file)
@@ -150,12 +207,16 @@ def main(job_title, input_file='largest_cities.csv', output_file='salary_results
             sleep(0.5)
 
     headers = ['Title', 'Location', 'Description', 'nTile10', 'nTile25', 'nTile50', 'nTile75', 'nTile90']
-    if not save_to_csv(output_file, salary_data, headers):
+
+    if not save_to_csv(output_file, salary_data, headers) or not save_to_excel(output_file, salary_data,
+                                                                               headers) or not save_to_json(output_file,
+                                                                                                            salary_data,
+                                                                                                            headers):
         print("Failed to save results.")
         return []
-
     return salary_data
 
 
 if __name__ == '__main__':
     main('senior accountant')
+
