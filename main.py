@@ -6,10 +6,29 @@ from time import sleep
 import requests
 from bs4 import BeautifulSoup
 
+from scrape_search_result import SearchResult
 from store_data import save_to_json, save_to_excel, save_to_csv
+from test import time_it
 
+job_titles = [
+    "Python Developer",
+    "Data Scientist",
+    "Software Engineer",
+    "Machine Learning Engineer",
+    "Business Analyst",
+    "Marketing Manager",
+    "Product Manager",
+    "Project Manager",
+    "Full Stack Developer",
+    "Cloud Architect",
+    "User Experience (UX) Designer",
+    "Data Analyst",
+    "Data Engineer",
+    "Natural Language Processing (NLP) Engineer",
+    "Computer Vision Engineer",
+    "Business Intelligence (BI) Analyst"
+]
 
-# pip install openpyxl
 
 def get_html(web_url):
     """Fetch the HTML content of a given URL."""
@@ -22,7 +41,7 @@ def get_html(web_url):
     return response
 
 
-def extract_salary_info(job_title: str, job_city: str) -> tuple | None:
+def extract_salary_info(job_title: str, job_city: str, job_url) -> tuple | None:
     """
         Extract salary information for a given job title and city from Salary.com.
 
@@ -39,10 +58,7 @@ def extract_salary_info(job_title: str, job_city: str) -> tuple | None:
         print("Error: Both job_title and job_city are required.")
         return None
 
-    template = 'https://www.salary.com/research/salary/alternate/{}-salary/{}'
-
-    job_title = job_title.replace(" ", "-").lower()
-    url = template.format(job_title, job_city)
+    url = f"{job_url}/{job_city}"
 
     try:
         response = get_html(url)
@@ -84,8 +100,8 @@ def extract_salary_info(job_title: str, job_city: str) -> tuple | None:
     return None
 
 
-
-def main(job_title, input_file='largest_cities.csv', output_file='salary_results.csv'):
+@time_it
+def main(job_titles: list, input_file='largest_cities.csv', output_file='salary_results'):
     """
        Extract salary data for a given job title from the largest US cities.
 
@@ -97,8 +113,7 @@ def main(job_title, input_file='largest_cities.csv', output_file='salary_results
        Returns:
            list: A list of salary data tuples.
        """
-    if "." in output_file:
-        output_file = output_file.split(".")[0]
+
     try:
         with open(input_file, newline='', encoding="utf-8") as file:
             reader = csv.reader(file)
@@ -112,36 +127,40 @@ def main(job_title, input_file='largest_cities.csv', output_file='salary_results
         print(f"Error reading input file: {e}")
         return []
 
-    print(f"Processing {len(cities)} cities for job title '{job_title}'...")
-
     salary_data = []
     batch_size = 10
-    for i, city in enumerate(cities, start=1):
-        try:
-            print(f"Processing city {i}/{len(cities)}: {city}...")
-            result = extract_salary_info(job_title, city)
-            if result:
-                salary_data.append(result)
-        except Exception as e:
-            print(f"Error processing city '{city}': {e}")
 
-        if i % batch_size == 0:
-            print(f"Sleeping after processing {batch_size} cities...")
-            sleep(2)
-        else:
-            sleep(0.5)
+    for job in job_titles:
+        link = SearchResult().scrape_url_structure(job).first_link
+        print(f"Processing {len(cities)} cities for job title '{job}'...")
+
+        for i, city in enumerate(cities, start=1):
+            try:
+                print(f"Processing city {i}/{len(cities)}: {city}...")
+                result = extract_salary_info(job, city, link)
+                if result:
+                    salary_data.append(result)
+            except Exception as e:
+                print(f"Error processing city '{city}': {e}")
+
+            if i % batch_size == 0:
+                print(f"Sleeping after processing {batch_size} cities...")
+                sleep(2)
+            else:
+                sleep(0.5)
 
     headers = ['Title', 'Location', 'Description', 'nTile10', 'nTile25', 'nTile50', 'nTile75', 'nTile90']
-
     if not save_to_csv(output_file, salary_data, headers) or not save_to_excel(output_file, salary_data,
-                                                                               headers) or not save_to_json(output_file,
-                                                                                                            salary_data,
-                                                                                                            headers):
+                                                                               headers) or not save_to_json(
+        output_file,
+        salary_data,
+        headers
+    ):
         print("Failed to save results.")
         return []
+
     return salary_data
 
 
 if __name__ == '__main__':
-    main('senior accountant')
-
+    record = main(job_titles)
