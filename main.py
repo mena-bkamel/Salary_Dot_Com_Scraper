@@ -6,8 +6,9 @@ from time import sleep
 import requests
 from bs4 import BeautifulSoup
 
+from formating import Format
 from scrape_search_result import SearchResult
-from store_data import save_to_json, save_to_excel, save_to_csv
+from store_data import create_db, insert_records, save_to_csv, save_to_json, save_to_excel
 from test import time_it
 
 job_titles = [
@@ -29,6 +30,13 @@ job_titles = [
     "Business Intelligence (BI) Analyst"
 ]
 
+
+def save_to_sqlite3_db(data: list[tuple]):
+    dtype_format = Format(job_title="str", job_location="str", job_description="str", nTile10="float", nTile25="float",
+                          nTile50="float", nTile75="float", nTile90="float").format_columns_db()
+    columns_db = dtype_format.col_definition_db
+    db_name, table_name, columns_list = create_db(columns=columns_db)
+    insert_records(db_name, table_name, columns_list, data)
 
 def get_html(web_url):
     """Fetch the HTML content of a given URL."""
@@ -130,11 +138,11 @@ def main(job_titles: list, input_file='largest_cities.csv', output_file='salary_
     salary_data = []
     batch_size = 10
 
-    for job in job_titles:
+    for job in job_titles[:3]:
         link = SearchResult().scrape_url_structure(job).first_link
         print(f"Processing {len(cities)} cities for job title '{job}'...")
 
-        for i, city in enumerate(cities, start=1):
+        for i, city in enumerate(cities[:3], start=1):
             try:
                 print(f"Processing city {i}/{len(cities)}: {city}...")
                 result = extract_salary_info(job, city, link)
@@ -164,3 +172,4 @@ def main(job_titles: list, input_file='largest_cities.csv', output_file='salary_
 
 if __name__ == '__main__':
     record = main(job_titles)
+    save_to_sqlite3_db(record)
